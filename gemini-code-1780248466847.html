@@ -1,0 +1,861 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+  <title>Premium Rubik's Cube 3D</title>
+  <style>
+    :root {
+      --bg-gradient: radial-gradient(circle at 50% 50%, #1a1528 0%, #090710 70%, #030206 100%);
+      --glass-bg: rgba(255, 255, 255, 0.04);
+      --glass-border: rgba(255, 255, 255, 0.08);
+      --glass-blur: blur(20px);
+      --text-main: #fffffe;
+      --text-muted: #94a1b2;
+    }
+
+    body {
+      margin: 0;
+      overflow: hidden;
+      background: var(--bg-gradient);
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+      touch-action: none;
+      user-select: none;
+    }
+    
+    #info {
+      position: absolute;
+      top: 25px;
+      left: 50%;
+      transform: translateX(-50%);
+      color: var(--text-main);
+      background: rgba(15, 14, 23, 0.6);
+      padding: 12px 24px;
+      border-radius: 50px;
+      backdrop-filter: var(--glass-blur);
+      -webkit-backdrop-filter: var(--glass-blur);
+      font-size: 13px;
+      font-weight: 500;
+      text-align: center;
+      pointer-events: none;
+      box-shadow: 0 10px 30px rgba(0,0,0,0.5);
+      border: 1px solid var(--glass-border);
+      width: 85%;
+      max-width: 440px;
+      letter-spacing: 0.3px;
+    }
+
+    #hint-box {
+      position: absolute;
+      bottom: 155px;
+      left: 50%;
+      transform: translateX(-50%) translateY(15px);
+      background: linear-gradient(135deg, #ff9f43, #ff5252);
+      color: #fffffe;
+      padding: 14px 24px;
+      border-radius: 16px;
+      font-size: 13px;
+      font-weight: 600;
+      box-shadow: 0 12px 35px rgba(255, 82, 82, 0.25);
+      pointer-events: none;
+      opacity: 0;
+      transition: all 0.5s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+      z-index: 5;
+      text-align: center;
+      width: 80%;
+      max-width: 380px;
+    }
+    #hint-box.show {
+      opacity: 1;
+      transform: translateX(-50%) translateY(0);
+    }
+
+    #ui-layer {
+      position: absolute;
+      bottom: 25px;
+      left: 50%;
+      transform: translateX(-50%);
+      display: flex;
+      flex-wrap: wrap;
+      justify-content: center;
+      gap: 10px;
+      background: var(--glass-bg);
+      padding: 14px 20px;
+      border-radius: 28px;
+      backdrop-filter: var(--glass-blur);
+      -webkit-backdrop-filter: var(--glass-blur);
+      z-index: 10;
+      box-shadow: 0 20px 50px rgba(0,0,0,0.6), inset 0 1px 0 rgba(255,255,255,0.1);
+      border: 1px solid var(--glass-border);
+      width: 90%;
+      max-width: 720px;
+    }
+
+    button {
+      padding: 11px 16px;
+      cursor: pointer;
+      background: rgba(255, 255, 255, 0.05);
+      color: var(--text-main);
+      border: 1px solid rgba(255, 255, 255, 0.1);
+      border-radius: 14px;
+      font-weight: 600;
+      font-size: 13px;
+      transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+
+    button:hover {
+      background: rgba(255, 255, 255, 0.15);
+      border-color: rgba(255, 255, 255, 0.25);
+      transform: translateY(-2px);
+      box-shadow: 0 5px 15px rgba(0,0,0,0.2);
+    }
+    
+    button:active { transform: translateY(0); }
+
+    .btn-undo { background: linear-gradient(135deg, #ff9f43, #f53b57); border: none; }
+    .btn-undo:hover { box-shadow: 0 5px 15px rgba(245, 59, 87, 0.3); }
+    
+    .btn-shuffle { background: linear-gradient(135deg, #341f97, #54a0ff); border: none; }
+    .btn-shuffle:hover { box-shadow: 0 5px 15px rgba(84, 160, 255, 0.3); }
+
+    .btn-reset { background: linear-gradient(135deg, #ee5253, #ff2222); border: none; }
+    .btn-reset:hover { box-shadow: 0 5px 15px rgba(255, 34, 34, 0.3); }
+
+    .btn-memo { background: #fffffe; color: #1e1b29; border: none; }
+    .btn-memo:hover { background: #f1f2f6; }
+    
+    .btn-numbers { background: rgba(0, 122, 255, 0.1); border-color: rgba(0, 122, 255, 0.3); }
+    #btn-autorotate { transition: all 0.3s ease; }
+
+    /* Красивое модальное окно */
+    .modal {
+      display: none;
+      position: fixed;
+      top: 0; left: 0; width: 100%; height: 100%;
+      background: rgba(5, 4, 8, 0.85);
+      backdrop-filter: blur(15px);
+      -webkit-backdrop-filter: blur(15px);
+      z-index: 100;
+      justify-content: center;
+      align-items: center;
+    }
+    .modal-content {
+      background: linear-gradient(145deg, #1e1c2a, #14121c);
+      color: var(--text-main);
+      padding: 30px;
+      border-radius: 32px;
+      max-width: 480px;
+      width: 85%;
+      box-shadow: 0 30px 70px rgba(0,0,0,0.8), inset 0 1px 0 rgba(255,255,255,0.05);
+      border: 1px solid rgba(255,255,255,0.05);
+      line-height: 1.6;
+      max-height: 80vh;
+      overflow-y: auto;
+    }
+    .modal-content h3 { margin-top: 0; color: #ff9f43; font-size: 24px; display: flex; align-items: center; gap: 10px;}
+    .modal-content p { font-size: 14px; color: var(--text-muted); }
+    .modal-content ul { padding-left: 20px; margin: 15px 0; font-size: 14px; color: var(--text-muted); }
+    .modal-content li { margin-bottom: 12px; }
+    
+    .modal-close-btn {
+      width: 100%;
+      background: linear-gradient(135deg, #ff9f43, #f53b57);
+      color: #fffffe;
+      border: none;
+      margin-top: 25px;
+      justify-content: center;
+      padding: 15px;
+      font-size: 15px;
+      border-radius: 16px;
+    }
+  </style>
+</head>
+<body>
+
+  <div id="info">
+    ✨ <strong>Зажмите и потяните грань кубика</strong> для вращения.
+  </div>
+
+  <div id="hint-box">💡 Подсказка: Попробуйте собрать белый крест на верхней грани!</div>
+
+  <div id="ui-layer">
+    <button class="btn-memo" onclick="toggleMemo(true)">📋 Памятка</button>
+    <button class="btn-numbers" id="btn-numbers" onclick="toggleNumbers()">🔢 Числа: Выкл</button>
+    <button id="btn-autorotate" onclick="toggleAutoRotate()">🔄 Вращение: Выкл</button>
+    <button onclick="resetCamera()">🎥 Камера</button>
+    <button class="btn-undo" onclick="undoMove()">⬅️ Назад</button>
+    <button class="btn-shuffle" onclick="shuffleCube()">🎲 Перемешать</button>
+    <button class="btn-reset" onclick="resetCube()">🔄 Сброс</button>
+  </div>
+
+  <div id="memo-modal" class="modal">
+    <div class="modal-content">
+      <h3>📋 Памятка для новичка</h3>
+      <p><strong>1. Анатомия кубика:</strong> Куб состоит из элементов 3 типов:</p>
+      <ul>
+        <li><strong>Центры (6 шт):</strong> Неподвижны друг относительно друга, задают итоговый цвет грани.</li>
+        <li><strong>Рёбра (12 шт):</strong> Элементы с 2 цветами.</li>
+        <li><strong>Углы (8 шт):</strong> Элементы с 3 цветами.</li>
+      </ul>
+      <p><strong>2. Управление:</strong> Потяните за цветную наклейку, чтобы повернуть слой. Потяните за пустой темный фон вокруг, чтобы вращать камеру.</p>
+      <p><strong>3. Проверенная стратегия сборки:</strong></p>
+      <ul>
+        <li><strong>Шаг 1:</strong> Соберите правильный белый крест на верхней грани (боковые ребра должны совпадать по цвету с боковыми центрами).</li>
+        <li><strong>Шаг 2:</strong> Поставьте на места 4 белых угла (нижний слой готов).</li>
+        <li><strong>Шаг 3:</strong> Собрать средний слой, расставив боковые ребра.</li>
+        <li><strong>Шаг 4:</strong> Желтый крест наверху и выравнивание его ребер.</li>
+        <li><strong>Шаг 5:</strong> Расстановка и разворот желтых углов.</li>
+      </ul>
+      <button class="modal-close-btn" onclick="toggleMemo(false)">Понятно, к игре!</button>
+    </div>
+  </div>
+
+  <script type="importmap">
+    {
+      "imports": {
+        "three": "https://unpkg.com/three@0.160.0/build/three.module.js",
+        "three/addons/": "https://unpkg.com/three@0.160.0/examples/jsm/"
+      }
+    }
+  </script>
+
+  <script type="module">
+    import * as THREE from 'three';
+    import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+
+    const scene = new THREE.Scene();
+    
+    const camera = new THREE.PerspectiveCamera(45, window.innerWidth / window.innerHeight, 0.1, 50);
+    camera.position.set(6, 6, 8);
+
+    const renderer = new THREE.WebGLRenderer({ antialias: true });
+    renderer.setSize(window.innerWidth, window.innerHeight);
+    renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+    
+    renderer.toneMapping = THREE.ACESFilmicToneMapping;
+    renderer.toneMappingExposure = 1.1;
+    document.body.appendChild(renderer.domElement);
+
+    const controls = new OrbitControls(camera, renderer.domElement);
+    controls.enableDamping = true;
+    controls.dampingFactor = 0.05;
+    controls.minDistance = 5;
+    controls.maxDistance = 14;
+
+    // СТУДИЙНОЕ СБАЛАНСИРОВАННОЕ ОСВЕЩЕНИЕ
+    scene.add(new THREE.AmbientLight(0xffffff, 0.6));
+    
+    const keyLight = new THREE.DirectionalLight(0xffffff, 0.8);
+    keyLight.position.set(8, 12, 8);
+    scene.add(keyLight);
+
+    const fillLight = new THREE.DirectionalLight(0xffffff, 0.4);
+    fillLight.position.set(-8, -4, -8);
+    scene.add(fillLight);
+
+    const topLight = new THREE.DirectionalLight(0xffffff, 0.5);
+    topLight.position.set(-6, 10, 6);
+    scene.add(topLight);
+
+    // КРАСИВЫЙ ТРЕХМЕРНЫЙ ЗВЕЗДНЫЙ ФОН
+    const starsGeometry = new THREE.BufferGeometry();
+    const starsCount = 400;
+    const starPositions = new Float32Array(starsCount * 3);
+    const starColors = new Float32Array(starsCount * 3);
+
+    for (let i = 0; i < starsCount * 3; i += 3) {
+      const radius = 9 + Math.random() * 14;
+      const u = Math.random();
+      const v = Math.random();
+      const theta = u * 2.0 * Math.PI;
+      const phi = Math.acos(2.0 * v - 1.0);
+      
+      starPositions[i] = radius * Math.sin(phi) * Math.cos(theta);
+      starPositions[i+1] = radius * Math.sin(phi) * Math.sin(theta);
+      starPositions[i+2] = radius * Math.cos(phi);
+
+      const r = Math.random();
+      if (r < 0.3) {
+        starColors[i] = 0.5; starColors[i+1] = 0.7; starColors[i+2] = 1.0; // Неоново-синие
+      } else if (r < 0.6) {
+        starColors[i] = 0.8; starColors[i+1] = 0.5; starColors[i+2] = 1.0; // Пурпурные космос
+      } else if (r < 0.8) {
+        starColors[i] = 1.0; starColors[i+1] = 0.8; starColors[i+2] = 0.4; // Золотистая пыль
+      } else {
+        starColors[i] = 1.0; starColors[i+1] = 1.0; starColors[i+2] = 1.0; // Чисто белые
+      }
+    }
+    starsGeometry.setAttribute('position', new THREE.BufferAttribute(starPositions, 3));
+    starsGeometry.setAttribute('color', new THREE.BufferAttribute(starColors, 3));
+
+    const starsMaterial = new THREE.PointsMaterial({
+      size: 0.13,
+      vertexColors: true,
+      transparent: true,
+      opacity: 0.85,
+      blending: THREE.AdditiveBlending,
+      depthWrite: false
+    });
+    const starField = new THREE.Points(starsGeometry, starsMaterial);
+    scene.add(starField);
+
+    const cubes = [];
+    const allStickers = []; 
+    const step = 1.04; 
+
+    const colorHexStrings = [
+      '#ff4757', 
+      '#ff9f43', 
+      '#ffffff', 
+      '#ffd32a', 
+      '#2ed573', 
+      '#1e90ff'  
+    ]; 
+    const internalColor = 0x111015; 
+
+    let showNumbers = false; 
+    let isAutoRotating = false;
+
+    const animGroup = new THREE.Group();
+    scene.add(animGroup);
+
+    function drawStickerTile(sticker) {
+      const { ctx, baseColor, numberText } = sticker;
+      ctx.fillStyle = '#111015'; 
+      ctx.fillRect(0, 0, 256, 256);
+      
+      ctx.fillStyle = baseColor;
+      const radius = 48; 
+      ctx.beginPath();
+      ctx.roundRect(14, 14, 228, 228, radius);
+      ctx.fill();
+      
+      if (showNumbers) {
+        ctx.fillStyle = (baseColor === '#ffffff' || baseColor === '#ffd32a') ? '#0c0a12' : '#ffffff';
+        ctx.font = 'bold 96px -apple-system, BlinkMacSystemFont, sans-serif';
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'middle';
+        ctx.fillText(numberText, 128, 128);
+      }
+      sticker.texture.needsUpdate = true;
+    }
+
+    function getStickerNumber(faceIndex, x, y, z) {
+      let r = 0, c = 0;
+      switch(faceIndex) {
+        case 0: r = 1 - y; c = 1 - z; return 28 + (r * 3 + c);
+        case 1: r = 1 - y; c = z + 1; return 10 + (r * 3 + c);
+        case 2: r = 1 - z; c = x + 1; return 1 + (r * 3 + c);
+        case 3: r = z + 1; c = x + 1; return 46 + (r * 3 + c);
+        case 4: r = 1 - y; c = x + 1; return 19 + (r * 3 + c);
+        case 5: r = 1 - y; c = 1 - x; return 37 + (r * 3 + c);
+      }
+      return 0;
+    }
+
+    function buildCube() {
+      for (let x = -1; x <= 1; x++) {
+        for (let y = -1; y <= 1; y++) {
+          for (let z = -1; z <= 1; z++) {
+            if (x === 0 && y === 0 && z === 0) continue;
+            
+            const materials = [];
+            for (let i = 0; i < 6; i++) {
+              const isOuter = (i===0 && x===1) || (i===1 && x===-1) || (i===2 && y===1) || 
+                              (i===3 && y===-1) || (i===4 && z===1) || (i===5 && z===-1);
+              
+              if (isOuter) {
+                const tileNum = getStickerNumber(i, x, y, z);
+                
+                const canvas = document.createElement('canvas');
+                canvas.width = 256;
+                canvas.height = 256;
+                const ctx = canvas.getContext('2d');
+                const texture = new THREE.CanvasTexture(canvas);
+                texture.colorSpace = THREE.SRGBColorSpace;
+
+                const stickerObj = { canvas, ctx, texture, baseColor: colorHexStrings[i], numberText: tileNum.toString() };
+                allStickers.push(stickerObj);
+                drawStickerTile(stickerObj);
+
+                materials.push(new THREE.MeshPhysicalMaterial({ 
+                  map: texture,
+                  roughness: 0.15,
+                  metalness: 0.05,
+                  clearcoat: 0.6,
+                  clearcoatRoughness: 0.08
+                }));
+              } else {
+                materials.push(new THREE.MeshPhysicalMaterial({ 
+                  color: internalColor,
+                  roughness: 0.25,
+                  metalness: 0.05
+                }));
+              }
+            }
+
+            const mesh = new THREE.Mesh(new THREE.BoxGeometry(0.98, 0.98, 0.98), materials);
+            mesh.position.set(x * step, y * step, z * step);
+            mesh.userData = { originalPos: mesh.position.clone() };
+            scene.add(mesh);
+            cubes.push(mesh);
+          }
+        }
+      }
+    }
+    buildCube();
+
+    const historyLog = [];
+    let isAnimating = false;      
+    let isShuffling = false;      
+    let isSnapAnimating = false;  
+    let isResetAnimating = false; 
+    let isCameraResetting = false;
+    let shuffleMovesCount = 0;
+    let lastShuffleMove = { axis: '', index: 0, dir: 0 };
+
+    let animAxis = '';
+    let animDir = 0;
+    let animProgress = 0; 
+    let animBlocks = [];
+
+    let snapAxis = '', snapStartAngle = 0, snapTargetAngle = 0, snapProgress = 0, snapBlocks = [], snapIndex = 0, snapRotDirSign = 1;
+    
+    let resetAnimProgress = 0;
+    let resetAnimStage = 0; 
+
+    let cameraResetProgress = 0;
+    const cameraStartPos = new THREE.Vector3();
+    const controlsStartTarget = new THREE.Vector3();
+
+    const hintsList = [
+      "💡 Запутались? Нажмите «Памятку» — там описан пошаговый алгоритм.",
+      "💡 Не знаете с чего начать? Попробуйте собрать белый крест на верхней грани!",
+      "💡 Вы всегда можете отменить любой ход кнопкой «⬅️ Назад».",
+      "💡 Покрутите пустой фон вокруг кубика, чтобы осмотреть его снизу или сзади."
+    ];
+    let lastInteractionTime = Date.now();
+    let hintShown = false;
+
+    function resetIdleTimer() {
+      lastInteractionTime = Date.now();
+      if (hintShown) {
+        document.getElementById('hint-box').classList.remove('show');
+        hintShown = false;
+      }
+    }
+
+    function showHint() {
+      if (isShuffling || isAnimating || isSnapAnimating || isResetAnimating || isCameraResetting) return;
+      const hintBox = document.getElementById('hint-box');
+      hintBox.innerText = hintsList[Math.floor(Math.random() * hintsList.length)];
+      hintBox.classList.add('show');
+      hintShown = true;
+    }
+
+    controls.addEventListener('change', resetIdleTimer);
+
+    window.toggleNumbers = () => {
+      showNumbers = !showNumbers;
+      allStickers.forEach(drawStickerTile);
+      document.getElementById('btn-numbers').innerText = showNumbers ? '🔢 Числа: Вкл' : '🔢 Числа: Выкл';
+      resetIdleTimer();
+    };
+
+    window.toggleAutoRotate = () => {
+      isAutoRotating = !isAutoRotating;
+      controls.autoRotate = isAutoRotating;
+      controls.autoRotateSpeed = 1.0; 
+      const btn = document.getElementById('btn-autorotate');
+      btn.innerText = isAutoRotating ? '🔄 Вращение: Вкл' : '🔄 Вращение: Выкл';
+      btn.style.background = isAutoRotating ? 'linear-gradient(135deg, #007bff, #00d2ff)' : 'rgba(255, 255, 255, 0.05)';
+      btn.style.borderColor = isAutoRotating ? 'transparent' : 'rgba(255, 255, 255, 0.1)';
+      resetIdleTimer();
+    };
+
+    window.resetCamera = () => {
+      if (isCameraResetting || isResetAnimating) return;
+      isCameraResetting = true;
+      cameraResetProgress = 0;
+      cameraStartPos.copy(camera.position);
+      controlsStartTarget.copy(controls.target);
+      controls.enabled = false; 
+      resetIdleTimer();
+    };
+
+    window.startLayerRotation = (axis, index, dir, isUndo = false) => {
+      if (isAnimating || isSnapAnimating || isResetAnimating || isCameraResetting) return;
+      isAnimating = true;
+      resetIdleTimer();
+
+      animAxis = axis;
+      animDir = dir;
+      animProgress = 0; 
+
+      animBlocks = cubes.filter(c => Math.round(c.position[axis] / step) === index);
+
+      animGroup.rotation.set(0, 0, 0);
+      animGroup.updateMatrixWorld();
+      animBlocks.forEach(b => animGroup.attach(b));
+
+      if (!isUndo) {
+        historyLog.push({ axis, index, dir });
+      }
+    };
+
+    window.undoMove = () => {
+      if (isAnimating || isShuffling || isSnapAnimating || isResetAnimating || isCameraResetting || historyLog.length === 0) return;
+      const lastMove = historyLog.pop();
+      window.startLayerRotation(lastMove.axis, lastMove.index, -lastMove.dir, true);
+    };
+
+    window.shuffleCube = () => {
+      if (isAnimating || isShuffling || isSnapAnimating || isResetAnimating || isCameraResetting) return;
+      isShuffling = true;
+      shuffleMovesCount = 30; 
+      runShuffleStep();
+    };
+
+    function runShuffleStep() {
+      if (shuffleMovesCount <= 0) {
+        isShuffling = false;
+        resetIdleTimer();
+        return;
+      }
+      shuffleMovesCount--;
+      
+      const axes = ['x', 'y', 'z'];
+      let axis, index, dir;
+      
+      let attempts = 0;
+      do {
+        axis = axes[Math.floor(Math.random() * 3)];
+        index = Math.floor(Math.random() * 3) - 1;
+        dir = Math.random() > 0.5 ? 1 : -1;
+        attempts++;
+      } while (
+        attempts < 10 && 
+        axis === lastShuffleMove.axis && 
+        index === lastShuffleMove.index && 
+        dir === -lastShuffleMove.dir
+      );
+      
+      lastShuffleMove = { axis, index, dir };
+      window.startLayerRotation(axis, index, dir, false);
+    }
+
+    window.resetCube = () => {
+      if (isAnimating || isShuffling || isSnapAnimating || isResetAnimating || isCameraResetting) return;
+      
+      isResetAnimating = true;
+      resetAnimProgress = 0;
+      resetAnimStage = 0; 
+
+      cubes.forEach(c => {
+        c.userData.resetStartPos = c.position.clone();
+        c.userData.resetStartRot = c.rotation.clone();
+        
+        const baseDir = c.position.clone().normalize();
+        const randomScatter = new THREE.Vector3(
+          (Math.random() - 0.5) * 0.6,
+          (Math.random() - 0.5) * 0.6,
+          (Math.random() - 0.5) * 0.6
+        );
+        c.userData.explodeVec = baseDir.add(randomScatter).normalize().multiplyScalar(4.0 + Math.random() * 2.5);
+        c.userData.explodeRot = new THREE.Vector3(
+          (Math.random() - 0.5) * 5,
+          (Math.random() - 0.5) * 5,
+          (Math.random() - 0.5) * 5
+        );
+      });
+    };
+
+    window.toggleMemo = (show) => {
+      document.getElementById('memo-modal').style.display = show ? 'flex' : 'none';
+      resetIdleTimer();
+    };
+
+    const raycaster = new THREE.Raycaster();
+    const pointer = new THREE.Vector2();
+    let isPointerDown = false;
+    
+    let startPointerNDC = new THREE.Vector2();
+    let intersectedObject = null;
+    let snappedNormal = new THREE.Vector3();
+    let hitWorldPoint = new THREE.Vector3();
+
+    let axisOption1 = '', axisOption2 = '';
+    let worldTangent1 = new THREE.Vector3(), worldTangent2 = new THREE.Vector3();
+    let screenTangent1 = new THREE.Vector2(), screenTangent2 = new THREE.Vector2();
+
+    let dragAxisLocked = null;
+    let dragIndex = 0;
+    let dragBlocks = [];
+    let chosenScreenTangent = new THREE.Vector2();
+    let chosenWorldTangent = new THREE.Vector3();
+    let rotDirSign = 1;
+
+    function projectToNDC(worldPos) {
+      let v = worldPos.clone().project(camera);
+      return new THREE.Vector2(v.x, v.y);
+    }
+
+    window.addEventListener('pointerdown', (e) => {
+      resetIdleTimer();
+      if (e.target.tagName === 'BUTTON' || e.target.closest('#ui-layer') || e.target.closest('.modal-content')) return;
+
+      pointer.x = (e.clientX / window.innerWidth) * 2 - 1;
+      pointer.y = -(e.clientY / window.innerHeight) * 2 + 1;
+
+      raycaster.setFromCamera(pointer, camera);
+      const intersects = raycaster.intersectObjects(cubes);
+
+      if (intersects.length > 0 && !isAnimating && !isShuffling && !isSnapAnimating && !isResetAnimating && !isCameraResetting) {
+        intersectedObject = intersects[0].object;
+        hitWorldPoint.copy(intersects[0].point);
+        
+        let rawNormal = intersects[0].face.normal.clone().applyQuaternion(intersectedObject.quaternion);
+        if (Math.abs(rawNormal.x) > Math.abs(rawNormal.y) && Math.abs(rawNormal.x) > Math.abs(rawNormal.z)) {
+          snappedNormal.set(Math.sign(rawNormal.x), 0, 0);
+        } else if (Math.abs(rawNormal.y) > Math.abs(rawNormal.x) && Math.abs(rawNormal.y) > Math.abs(rawNormal.z)) {
+          snappedNormal.set(0, Math.sign(rawNormal.y), 0);
+        } else {
+          snappedNormal.set(0, 0, Math.sign(rawNormal.z));
+        }
+
+        if (snappedNormal.x !== 0) { 
+          axisOption1 = 'y'; worldTangent1.set(0, 0, 1); 
+          axisOption2 = 'z'; worldTangent2.set(0, 1, 0); 
+        } else if (snappedNormal.y !== 0) { 
+          axisOption1 = 'x'; worldTangent1.set(0, 0, 1); 
+          axisOption2 = 'z'; worldTangent2.set(1, 0, 0); 
+        } else { 
+          axisOption1 = 'x'; worldTangent1.set(0, 1, 0); 
+          axisOption2 = 'y'; worldTangent2.set(1, 0, 0); 
+        }
+
+        let screenP = projectToNDC(hitWorldPoint);
+        screenTangent1.copy(projectToNDC(hitWorldPoint.clone().add(worldTangent1)).sub(screenP));
+        screenTangent2.copy(projectToNDC(hitWorldPoint.clone().add(worldTangent2)).sub(screenP));
+
+        startPointerNDC.set(pointer.x, pointer.y);
+        isPointerDown = true;
+        dragAxisLocked = null;
+        controls.enabled = false; 
+      }
+    });
+
+    window.addEventListener('pointermove', (e) => {
+      if (!isPointerDown) return;
+      resetIdleTimer();
+
+      pointer.x = (e.clientX / window.innerWidth) * 2 - 1;
+      pointer.y = -(e.clientY / window.innerHeight) * 2 + 1;
+
+      if (isAnimating || isShuffling || isSnapAnimating || isResetAnimating || isCameraResetting) return;
+
+      let swipeVectorNDC = pointer.clone().sub(startPointerNDC);
+
+      if (dragAxisLocked === null) {
+        if (swipeVectorNDC.length() > 0.02) {
+          let dot1 = swipeVectorNDC.dot(screenTangent1);
+          let dot2 = swipeVectorNDC.dot(screenTangent2);
+
+          if (Math.abs(dot1) > Math.abs(dot2)) {
+            dragAxisLocked = axisOption1;
+            chosenScreenTangent.copy(screenTangent1);
+            chosenWorldTangent.copy(worldTangent1);
+          } else {
+            dragAxisLocked = axisOption2;
+            chosenScreenTangent.copy(screenTangent2);
+            chosenWorldTangent.copy(worldTangent2);
+          }
+
+          dragIndex = Math.round(intersectedObject.position[dragAxisLocked] / step);
+          dragBlocks = cubes.filter(c => Math.round(c.position[dragAxisLocked] / step) === dragIndex);
+
+          animGroup.rotation.set(0, 0, 0);
+          animGroup.updateMatrixWorld();
+          dragBlocks.forEach(b => animGroup.attach(b));
+
+          let rotDirVector = new THREE.Vector3().crossVectors(snappedNormal, chosenWorldTangent);
+          rotDirSign = Math.sign(rotDirVector[dragAxisLocked]);
+        }
+      } else {
+        let scalarProj = swipeVectorNDC.dot(chosenScreenTangent) / chosenScreenTangent.lengthSq();
+        let dragAngle = scalarProj * (Math.PI / 2); 
+        animGroup.rotation[dragAxisLocked] = dragAngle * rotDirSign;
+      }
+    });
+
+    window.addEventListener('pointerup', () => {
+      isPointerDown = false;
+      if (!isCameraResetting) controls.enabled = true; 
+
+      if (dragAxisLocked !== null) {
+        let currentAngle = animGroup.rotation[dragAxisLocked];
+        let targetAngle = Math.round(currentAngle / (Math.PI / 2)) * (Math.PI / 2);
+        
+        isSnapAnimating = true;
+        snapAxis = dragAxisLocked;
+        snapStartAngle = currentAngle;
+        snapTargetAngle = targetAngle;
+        snapProgress = 0;
+        snapBlocks = [...dragBlocks];
+        snapIndex = dragIndex;
+        snapRotDirSign = rotDirSign;
+
+        dragAxisLocked = null;
+      }
+    });
+
+    window.addEventListener('resize', () => {
+      camera.aspect = window.innerWidth / window.innerHeight;
+      camera.updateProjectionMatrix();
+      renderer.setSize(window.innerWidth, window.innerHeight);
+    });
+
+    function animate() {
+      requestAnimationFrame(animate);
+
+      // Вращение космических звезд
+      starField.rotation.y += 0.0006;
+      starField.rotation.x += 0.0002;
+
+      if (!isAnimating && !isShuffling && !isSnapAnimating && !isResetAnimating && !isCameraResetting && !hintShown && (Date.now() - lastInteractionTime > 12000)) {
+        showHint();
+      }
+
+      if (isCameraResetting) {
+        cameraResetProgress += 0.025; 
+        if (cameraResetProgress >= 1) {
+          camera.position.set(6, 6, 8);
+          controls.target.set(0, 0, 0);
+          isCameraResetting = false;
+          controls.enabled = true; 
+        } else {
+          let t = cameraResetProgress;
+          let ease = t < 0.5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2; 
+          camera.position.lerpVectors(cameraStartPos, new THREE.Vector3(6, 6, 8), ease);
+          controls.target.lerpVectors(controlsStartTarget, new THREE.Vector3(0, 0, 0), ease);
+        }
+      }
+
+      if (isResetAnimating) {
+        if (resetAnimStage === 0) {
+          resetAnimProgress += 0.05; 
+          if (resetAnimProgress >= 1) {
+            resetAnimStage = 1;
+            resetAnimProgress = 0;
+            cubes.forEach(c => {
+              c.userData.resetMidPos = c.position.clone();
+              c.userData.resetMidRot = c.rotation.clone();
+            });
+          } else {
+            let t = resetAnimProgress;
+            let easeOut = Math.sin(t * Math.PI / 2); 
+            cubes.forEach(c => {
+              c.position.copy(c.userData.resetStartPos).addScaledVector(c.userData.explodeVec, easeOut);
+              c.rotation.set(
+                c.userData.resetStartRot.x + c.userData.explodeRot.x * easeOut,
+                c.userData.resetStartRot.y + c.userData.explodeRot.y * easeOut,
+                c.userData.resetStartRot.z + c.userData.explodeRot.z * easeOut
+              );
+            });
+          }
+        } else if (resetAnimStage === 1) {
+          resetAnimProgress += 0.025; 
+          if (resetAnimProgress >= 1) {
+            cubes.forEach(c => {
+              c.position.copy(c.userData.originalPos);
+              c.rotation.set(0, 0, 0);
+            });
+            isResetAnimating = false;
+            historyLog.length = 0;
+            resetIdleTimer();
+          } else {
+            let t = resetAnimProgress;
+            let easeInOut = t * t * (3 - 2 * t); 
+            cubes.forEach(c => {
+              c.position.lerpVectors(c.userData.resetMidPos, c.userData.originalPos, easeInOut);
+              c.rotation.x = THREE.MathUtils.lerp(c.userData.resetMidRot.x, 0, easeInOut);
+              c.rotation.y = THREE.MathUtils.lerp(c.userData.resetMidRot.y, 0, easeInOut);
+              c.rotation.z = THREE.MathUtils.lerp(c.userData.resetMidRot.z, 0, easeInOut);
+            });
+          }
+        }
+      }
+
+      if (isSnapAnimating) {
+        snapProgress += 0.15; 
+        if (snapProgress >= 1) {
+          animGroup.rotation[snapAxis] = snapTargetAngle;
+          animGroup.updateMatrixWorld();
+          
+          snapBlocks.forEach(b => {
+            scene.attach(b);
+            b.position.x = Math.round(b.position.x / step) * step;
+            b.position.y = Math.round(b.position.y / step) * step;
+            b.position.z = Math.round(b.position.z / step) * step;
+
+            b.rotation.x = Math.round(b.rotation.x / (Math.PI/2)) * (Math.PI/2);
+            b.rotation.y = Math.round(b.rotation.y / (Math.PI/2)) * (Math.PI/2);
+            b.rotation.z = Math.round(b.rotation.z / (Math.PI/2)) * (Math.PI/2);
+          });
+
+          if (snapTargetAngle !== 0) {
+            let standardDir = Math.sign(snapTargetAngle);
+            historyLog.push({ axis: snapAxis, index: snapIndex, dir: standardDir });
+          }
+
+          isSnapAnimating = false;
+          resetIdleTimer();
+        } else {
+          animGroup.rotation[snapAxis] = THREE.MathUtils.lerp(snapStartAngle, snapTargetAngle, snapProgress);
+        }
+      }
+
+      // УЛЬТРА-ПЛАВНАЯ АНИМАЦИЯ ХОДОВ И ПЕРЕМЕШИВАНИЯ (Smoothstep Easing)
+      if (isAnimating) {
+        let speedStep = isShuffling ? 0.075 : 0.045; 
+        animProgress += speedStep;
+        
+        if (animProgress >= 1) {
+          animProgress = 1;
+        }
+
+        let t = animProgress;
+        let easeInOut = t * t * (3 - 2 * t); 
+        
+        animGroup.rotation[animAxis] = (Math.PI / 2) * animDir * easeInOut;
+        animGroup.updateMatrixWorld();
+
+        if (animProgress >= 1) {
+          const tempArr = [...animBlocks];
+          tempArr.forEach(b => {
+            scene.attach(b);
+            b.position.x = Math.round(b.position.x / step) * step;
+            b.position.y = Math.round(b.position.y / step) * step;
+            b.position.z = Math.round(b.position.z / step) * step;
+
+            b.rotation.x = Math.round(b.rotation.x / (Math.PI/2)) * (Math.PI/2);
+            b.rotation.y = Math.round(b.rotation.y / (Math.PI/2)) * (Math.PI/2);
+            b.rotation.z = Math.round(b.rotation.z / (Math.PI/2)) * (Math.PI/2);
+          });
+
+          isAnimating = false;
+          if (isShuffling) runShuffleStep();
+        }
+      }
+
+      controls.update();
+      renderer.render(scene, camera);
+    }
+    
+    animate();
+  </script>
+</body>
+</html>
