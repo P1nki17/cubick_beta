@@ -1,0 +1,962 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, shrink-to-fit=no, viewport-fit=cover">
+    <title>RUBICK³ — Кубик Рубика (Mobile Fixed)</title>
+    <link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Lauren+Script&display=swap" rel="stylesheet">
+    <style>
+        *{margin:0;padding:0;box-sizing:border-box}
+        body{
+            background:radial-gradient(ellipse at 50% 50%, #3a3a3a 0%, #2a2a2a 40%, #1a1a1a 70%, #0a0a0a 100%);
+            overflow:hidden;font-family:'Segoe UI',system-ui,sans-serif;
+            user-select:none;-webkit-user-select:none;cursor:default;
+            height:100vh;width:100vw;touch-action:none;position:relative;
+        }
+        canvas{display:block;position:absolute;top:0;left:0;z-index:1;width:100%;height:100%;}
+        
+        /* Обновленная шапка: логотип + подпись под ним */
+        #header{
+            position:fixed;
+            top:10px;
+            left:0;
+            right:0;
+            z-index:20;
+            padding:10px;
+            display:flex;
+            flex-direction:column;      /* меняем направление на колонку */
+            align-items:center;
+            justify-content:center;
+            background:transparent;
+            pointer-events:none;
+            text-align:center;
+        }
+        #logo-text{
+            font-family:'Bebas Neue','Lauren Script','Gveret Levin','Segoe UI',cursive;
+            font-size:94px;
+            font-weight:400;
+            color:#fff;
+            letter-spacing:3px;
+            text-shadow:0 2px 10px rgba(255,255,255,0.3);
+            line-height:1;
+        }
+        /* новый стиль для подсказки под логотипом с анимацией исчезновения */
+        #sub-hint{
+            font-family:'Segoe UI',system-ui,sans-serif;
+            font-size:14px;
+            font-weight:500;
+            color:rgba(255,255,255,0.8);
+            text-shadow:0 1px 4px rgba(0,0,0,0.5);
+            background:rgba(0,0,0,0.3);
+            backdrop-filter:blur(4px);
+            padding:4px 14px;
+            border-radius:40px;
+            margin-top:8px;
+            letter-spacing:0.5px;
+            white-space:nowrap;
+            pointer-events:none;
+            transition: opacity 0.25s ease, transform 0.2s ease;
+            opacity: 1;
+            transform: translateY(0);
+        }
+        #sub-hint.hidden-tip {
+            opacity: 0;
+            transform: translateY(-5px);
+            pointer-events: none;
+        }
+        
+        /* старый hint больше не нужен, скрываем */
+        #hint{
+            display:none;
+        }
+        
+        /* Общий контейнер для интерфейса */
+        #ui-wrapper {
+            position: fixed;
+            bottom: 20px;
+            left: 50%;
+            transform: translateX(-50%);
+            z-index: 10;
+            width: calc(100% - 24px);
+            max-width: 440px;
+            pointer-events: none;
+            height: auto;
+        }
+        
+        /* Кнопка переключения меню */
+        #btnToggleUI {
+            pointer-events: auto;
+            position: absolute;
+            top: -22px; 
+            right: 12px;
+            width: 44px;
+            height: 44px;
+            padding: 0;
+            border-radius: 50%;
+            background: rgba(255, 255, 255, 0.2);
+            backdrop-filter: blur(10px);
+            -webkit-backdrop-filter: blur(10px);
+            border: 1px solid rgba(255,255,255,0.25);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 16px;
+            cursor: pointer;
+            box-shadow: 0 4px 16px rgba(0,0,0,0.3);
+            z-index: 15;
+            transition: transform 0.4s cubic-bezier(0.4, 0, 0.2, 1), top 0.4s cubic-bezier(0.4, 0, 0.2, 1), right 0.4s cubic-bezier(0.4, 0, 0.2, 1), background 0.2s;
+        }
+
+        #btnToggleUI.menu-hidden {
+            top: 50%;
+            right: 50%;
+            transform: translate(50%, -50%);
+            background: rgba(255, 255, 255, 0.15);
+        }
+
+        #btnToggleUI .arrow {
+            transition: transform 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+            transform: rotate(0deg);
+            display: inline-block;
+        }
+
+        #btnToggleUI.menu-hidden .arrow {
+            transform: rotate(180deg);
+        }
+        
+        #ui-container{
+            pointer-events: auto;
+            display:grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap:8px;
+            background:rgba(255, 255, 255, 0.12);
+            backdrop-filter:blur(20px);
+            -webkit-backdrop-filter:blur(20px);
+            padding:12px;
+            padding-top: 28px;
+            border-radius:24px;
+            box-shadow:0 8px 32px rgba(0,0,0,0.4), inset 0 1px 1px rgba(255,255,255,0.2);
+            border:1px solid rgba(255,255,255,0.15);
+            width:100%;
+            transition: transform 0.4s cubic-bezier(0.4, 0, 0.2, 1), opacity 0.4s ease;
+            opacity: 1;
+            transform: translateY(0);
+        }
+
+        #ui-container.hidden {
+            transform: translateY(calc(100% + 40px));
+            opacity: 0;
+            pointer-events: none;
+        }
+        
+        button{
+            padding:10px 4px;
+            font-size:12px;
+            font-weight:600;
+            border:1px solid rgba(255, 255, 255, 0.2);
+            border-radius:16px;
+            cursor:pointer;
+            transition:all 0.2s ease;
+            position:relative;
+            overflow:hidden;
+            color:rgba(255, 255, 255, 0.95);
+            background:rgba(255, 255, 255, 0.08);
+            text-shadow:0 1px 2px rgba(0,0,0,0.3);
+            white-space:nowrap;
+            text-align:center;
+            -webkit-tap-highlight-color: transparent;
+            min-height:44px;
+            display:flex;
+            align-items:center;
+            justify-content:center;
+        }
+        button::after{
+            content:'';position:absolute;top:0;left:0;width:100%;height:100%;
+            background:linear-gradient(180deg,rgba(255,255,255,0.1) 0%,transparent 50%);
+            pointer-events:none;border-radius:16px
+        }
+        button:active{
+            transform:scale(0.95);
+            background:rgba(255, 255, 255, 0.25);
+        }
+        #btnToggleUI:active {
+            transform: scale(0.95);
+        }
+        #btnToggleUI.menu-hidden:active {
+            transform: translate(50%, -50%) scale(0.95);
+        }
+        button:disabled{
+            opacity:0.25;cursor:not-allowed;transform:none !important;box-shadow:none !important;
+        }
+        
+        button.active{
+            background:rgba(255, 255, 255, 0.9) !important;
+            color:#1a1a1a !important;
+            border-color:#fff !important;
+            text-shadow:none !important;
+            box-shadow:0 4px 12px rgba(255,255,255,0.3);
+        }
+        
+        #btnReset {
+            grid-column: span 3;
+            background:rgba(255, 255, 255, 0.18);
+            border-color:rgba(255, 255, 255, 0.35);
+            font-weight: 700;
+        }
+
+        /* небольшая адаптация для совсем узких экранов, чтобы подпись не ломалась */
+        @media (max-width: 500px) {
+            #sub-hint {
+                font-size: 11px;
+                white-space: nowrap;
+                padding: 3px 12px;
+            }
+            #logo-text {
+                font-size: 68px;
+            }
+        }
+        @media (max-width: 380px) {
+            #sub-hint {
+                font-size: 10px;
+                white-space: nowrap;
+            }
+            #logo-text {
+                font-size: 56px;
+            }
+        }
+    </style>
+</head>
+<body>
+    <!-- Обновленная шапка: логотип + текст-подсказка прямо под ним -->
+    <div id="header">
+        <div id="logo-text">RUBICK³</div>
+        <div id="sub-hint">Проведите по грани кубика, чтобы повернуть слой</div>
+    </div>
+    <!-- старый hint скрыт через CSS, оставляем для совместимости если что -->
+    <div id="hint"></div>
+    
+    <div id="ui-wrapper">
+        <button id="btnToggleUI" title="Скрыть/Показать меню"><span class="arrow">▼</span></button>
+        <div id="ui-container">
+            <button id="btnToggleSize">🧩 2х2</button>
+            <button id="btnNumbers">🔢 Числа</button>
+            <button id="btnShuffle">🎲 Перемешать</button>
+            <button id="btnAutoRotate">🔄 Прокручивание</button>
+            <button id="btnFaces">🎨 Грани</button>
+            <button id="btnRealign">📐 Выровнять</button>
+            <button id="btnReset">🔄 СБРОСИТЬ КУБ</button>
+        </div>
+    </div>
+
+    <script type="importmap">
+        {"imports":{"three":"https://unpkg.com/three@0.160.0/build/three.module.js","three/addons/":"https://unpkg.com/three@0.160.0/examples/jsm/"}}
+    </script>
+
+    <script type="module">
+        import * as THREE from 'three';
+
+        // ============ КОНСТАНТЫ ============
+        const CUBIE_SIZE = 0.69;
+        const GAP = 0.01;
+        const STEP = CUBIE_SIZE + GAP;
+        const INTERNAL_COLOR = '#0a0a0a';
+        const LABEL_DISTANCE = STEP * 1.5 + 0.3;
+        const SNAP_THRESHOLD = 0.0005;
+        const SNAP_SPEED = 0.12;
+        const ANIM_SPEED = 0.035;
+        const CHAOS_MAX_SPEED = 1.2;
+        const CHAOS_CHANGE_INTERVAL = 2000;
+        const COLORS = ['#ff1a1a', '#ff7f00', '#ffffff', '#ffd700', '#0066ff', '#009933'];
+
+        // ============ УПРАВЛЕНИЕ ПОДСКАЗКОЙ (исчезновение на время движения) ============
+        const hintElement = document.getElementById('sub-hint');
+        let hintHideTimer = null;
+        
+        function hideHintTemporarily() {
+            if (hintHideTimer) {
+                clearTimeout(hintHideTimer);
+                hintHideTimer = null;
+            }
+            // Убираем класс скрытия, если он был – чтобы сбросить ожидание повторного появления
+            hintElement.classList.remove('hidden-tip');
+            // Принудительно прячем с анимацией
+            hintElement.classList.add('hidden-tip');
+            
+            // Через 1 секунду после последнего вызова показываем снова
+            hintHideTimer = setTimeout(() => {
+                if (hintElement) {
+                    hintElement.classList.remove('hidden-tip');
+                }
+                hintHideTimer = null;
+            }, 30000);
+        }
+        
+        // Функция, которая вызывается в начале любого действия с кубиком (вращение, сброс, микс, ресайз и т.д.)
+        function onCubeActionStart() {
+            hideHintTemporarily();
+        }
+        
+        // ============ СЦЕНА ============
+        const scene = new THREE.Scene();
+        scene.background = null;
+
+        const camera = new THREE.PerspectiveCamera(45, window.innerWidth / window.innerHeight, 0.4, 40);
+        camera.position.set(5.5, 4.5, 6.5);
+        camera.lookAt(0, 0, 0);
+
+        const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true, powerPreference: "high-performance" });
+        renderer.setSize(window.innerWidth, window.innerHeight);
+        renderer.setPixelRatio(window.devicePixelRatio);
+        renderer.toneMapping = THREE.ACESFilmicToneMapping;
+        renderer.toneMappingExposure = 1.4;
+        renderer.outputColorSpace = THREE.SRGBColorSpace;
+        document.body.appendChild(renderer.domElement);
+
+        const maxAnisotropy = renderer.capabilities.getMaxAnisotropy();
+
+        // ============ ИСПРАВЛЕННАЯ ЛОГИКА КАМЕРЫ ============
+        function adjustFOV() {
+            const aspect = window.innerWidth / window.innerHeight;
+            
+            // Настройка камеры для адаптации под мобильные устройства
+            if (aspect < 1) { 
+                camera.fov = 55; // Увеличиваем FOV на узких экранах
+                camera.position.set(6.5, 5.5, 7.5);
+            } else { 
+                camera.fov = 40;
+                camera.position.set(5.5, 4.5, 6.5);
+            }
+            
+            camera.aspect = aspect;
+            camera.updateProjectionMatrix();
+            // Гарантируем, что камера всегда смотрит в центр
+            camera.lookAt(0, 0, 0);
+        }
+
+        // Вызываем один раз при старте
+        adjustFOV();
+
+        // Исправленный обработчик изменения размера с задержкой (debounce)
+        window.addEventListener('resize', () => {
+            clearTimeout(window.resizeTimer);
+            window.resizeTimer = setTimeout(() => {
+                adjustFOV();
+                renderer.setSize(window.innerWidth, window.innerHeight);
+            }, 200);
+        });
+
+        // ============ УПРАВЛЕНИЕ КАМЕРОЙ ============
+        const cameraState = {
+            target: new THREE.Vector3(0, 0, 0),
+            isDragging: false,
+            prevX: 0,
+            prevY: 0,
+            rotateSpeed: 0.007
+        };
+
+        function rotateCameraFree(deltaX, deltaY) {
+            const qX = new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(0, 1, 0), -deltaX);
+            camera.position.applyQuaternion(qX);
+            camera.up.applyQuaternion(qX);
+
+            const right = new THREE.Vector3(1, 0, 0).applyQuaternion(camera.quaternion);
+            const qY = new THREE.Quaternion().setFromAxisAngle(right, -deltaY);
+            camera.position.applyQuaternion(qY);
+            camera.up.applyQuaternion(qY);
+
+            camera.lookAt(cameraState.target);
+        }
+
+        // ============ ОСВЕЩЕНИЕ ============
+        const ambientLight = new THREE.AmbientLight('#8899bb', 2.5);
+        scene.add(ambientLight);
+
+        const keyLight = new THREE.DirectionalLight('#ffffff', 2.0);
+        keyLight.position.set(5, 8, 5);
+        scene.add(keyLight);
+
+        const fillLights = [
+            { color: '#8899cc', intensity: 0.8, position: [0, -5, 0] },
+            { color: '#ffffff', intensity: 1.2, position: [-5, 0, 0] },
+            { color: '#ffffff', intensity: 1.2, position: [5, 0, 0] },
+            { color: '#ffffff', intensity: 1.0, position: [0, 0, 5] }
+        ];
+        fillLights.forEach(({ color, intensity, position }) => {
+            const light = new THREE.DirectionalLight(color, intensity);
+            light.position.set(...position);
+            scene.add(light);
+        });
+
+        // ============ ГРУППЫ И СОСТОЯНИЯ ============
+        const animGroup = new THREE.Group();
+        scene.add(animGroup);
+        
+        const labelsGroup = new THREE.Group();
+        scene.add(labelsGroup);
+
+        const cubes = [];
+        const allStickers = [];
+        const faceLabels = {};
+        let currentSize = 3;
+        let numbersVisible = false;
+        let facesVisible = false;
+        let scatterAnim = null;
+        
+        let isAnimating = false;
+        let animAxis = '', animDir = 0, animProgress = 0, animBlocks = [];
+        let isSnapAnimating = false;
+        let snapAxis = '', snapTargetAngle = 0, snapBlocks = [];
+        let isShuffling = false;
+        let shuffleMoves = [], shuffleIndex = 0;
+        
+        let isPointerDown = false;
+        let startPointerNDC = new THREE.Vector2();
+        let intersectedObject = null;
+        let snappedNormal = new THREE.Vector3();
+        let hitWorldPoint = new THREE.Vector3();
+        let axisOption1 = '', axisOption2 = '';
+        let worldTangent1 = new THREE.Vector3(), worldTangent2 = new THREE.Vector3();
+        let screenTangent1 = new THREE.Vector2(), screenTangent2 = new THREE.Vector2();
+        let dragAxisLocked = null;
+        let dragIndex = 0, dragBlocks = [];
+        let chosenScreenTangent = new THREE.Vector2();
+        let chosenWorldTangent = new THREE.Vector3();
+        let rotDirSign = 1;
+        
+        let isAutoRotating = false;
+        let chaosSpeedX = 0, chaosSpeedY = 0;
+        let chaosTargetSpeedX = 0, chaosTargetSpeedY = 0;
+        let lastChaosChange = 0;
+        
+        let isRealigning = false;
+        let realignAnim = {
+            active: false,
+            startPos: new THREE.Vector3(),
+            endPos: new THREE.Vector3(5.5, 4.5, 6.5),
+            startUp: new THREE.Vector3(),
+            endUp: new THREE.Vector3(0, 1, 0),
+            progress: 0,
+            duration: 800,
+            startTime: 0
+        };
+
+        // ============ УТИЛИТЫ И КУБИК ============
+        function projectToNDC(worldPos) {
+            const v = worldPos.clone().project(camera);
+            return new THREE.Vector2(v.x, v.y);
+        }
+
+        function createStickerTexture(colorHex, number) {
+            const canvas = document.createElement('canvas');
+            canvas.width = 128; canvas.height = 128;
+            const ctx = canvas.getContext('2d');
+            
+            ctx.fillStyle = '#0a0a0a';
+            ctx.fillRect(0, 0, 128, 128);
+            
+            const margin = 8, radius = 12;
+            ctx.fillStyle = colorHex;
+            ctx.beginPath();
+            ctx.roundRect(margin, margin, 128 - margin * 2, 128 - margin * 2, radius);
+            ctx.fill();
+            
+            if (number !== undefined && numbersVisible) {
+                ctx.fillStyle = (colorHex === '#ffffff' || colorHex === '#ffd700') ? '#0a0a0a' : '#ffffff';
+                ctx.font = 'bold 48px -apple-system, BlinkMacSystemFont, sans-serif';
+                ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+                ctx.fillText(number.toString(), 64, 64);
+            }
+            
+            const texture = new THREE.CanvasTexture(canvas);
+            texture.colorSpace = THREE.SRGBColorSpace;
+            texture.anisotropy = maxAnisotropy;
+            return texture;
+        }
+
+        function updateAllStickers() {
+            allStickers.forEach(s => {
+                const texture = createStickerTexture(s.color, numbersVisible ? s.num : undefined);
+                s.texture.image = texture.image;
+                s.texture.needsUpdate = true;
+            });
+        }
+
+        function snapAndUpdate(blocks) {
+            blocks.forEach(b => {
+                scene.attach(b);
+                if (currentSize === 3) {
+                    b.position.x = Math.round(b.position.x / STEP) * STEP;
+                    b.position.y = Math.round(b.position.y / STEP) * STEP;
+                    b.position.z = Math.round(b.position.z / STEP) * STEP;
+                } else {
+                    b.position.x = (b.position.x > 0 ? 0.5 : -0.5) * STEP;
+                    b.position.y = (b.position.y > 0 ? 0.5 : -0.5) * STEP;
+                    b.position.z = (b.position.z > 0 ? 0.5 : -0.5) * STEP;
+                }
+                b.rotation.x = Math.round(b.rotation.x / (Math.PI / 2)) * (Math.PI / 2);
+                b.rotation.y = Math.round(b.rotation.y / (Math.PI / 2)) * (Math.PI / 2);
+                b.rotation.z = Math.round(b.rotation.z / (Math.PI / 2)) * (Math.PI / 2);
+            });
+            
+            cubes.forEach(c => {
+                const wp = c.getWorldPosition(new THREE.Vector3());
+                if (currentSize === 3) {
+                    c.userData.gridPos.set(Math.round(wp.x / STEP), Math.round(wp.y / STEP), Math.round(wp.z / STEP));
+                } else {
+                    c.userData.gridPos.set(wp.x > 0 ? 1 : -1, wp.y > 0 ? 1 : -1, wp.z > 0 ? 1 : -1);
+                }
+            });
+        }
+
+        function setButtonsDisabled(state) {
+            ['btnShuffle', 'btnReset', 'btnAutoRotate', 'btnRealign', 'btnFaces', 'btnNumbers', 'btnToggleSize']
+                .forEach(id => { const el = document.getElementById(id); if (el) el.disabled = state; });
+        }
+
+        function buildCube(size = 3) {
+            cubes.forEach(c => scene.remove(c));
+            cubes.length = 0;
+            allStickers.length = 0;
+            currentSize = size;
+            
+            const iterations = size === 3 ? [-1, 0, 1] : [-0.5, 0.5];
+            let cubieCounter = 0;
+            
+            iterations.forEach(x => {
+                iterations.forEach(y => {
+                    iterations.forEach(z => {
+                        if (size === 3 && x === 0 && y === 0 && z === 0) return;
+                        cubieCounter++;
+                        const materials = [];
+                        for (let i = 0; i < 6; i++) {
+                            const isOuter = 
+                                (i === 0 && x > 0 && (size === 2 || x === 1)) || 
+                                (i === 1 && x < 0 && (size === 2 || x === -1)) || 
+                                (i === 2 && y > 0 && (size === 2 || y === 1)) || 
+                                (i === 3 && y < 0 && (size === 2 || y === -1)) || 
+                                (i === 4 && z > 0 && (size === 2 || z === 1)) || 
+                                (i === 5 && z < 0 && (size === 2 || z === -1));
+                            
+                            if (isOuter) {
+                                const num = cubieCounter; 
+                                const texture = createStickerTexture(COLORS[i], num);
+                                allStickers.push({ texture, color: COLORS[i], num, x, y, z, faceIndex: i });
+                                materials.push(new THREE.MeshPhongMaterial({ map: texture, specular: '#111111', shininess: 5 }));
+                            } else {
+                                materials.push(new THREE.MeshStandardMaterial({ color: INTERNAL_COLOR, roughness: 0.8, metalness: 0.01 }));
+                            }
+                        }
+                        
+                        const mesh = new THREE.Mesh(new THREE.BoxGeometry(CUBIE_SIZE, CUBIE_SIZE, CUBIE_SIZE), materials);
+                        mesh.position.set(x * STEP, y * STEP, z * STEP);
+                        mesh.userData = {
+                            originalPos: mesh.position.clone(),
+                            gridPos: new THREE.Vector3(x > 0 ? 1 : (x < 0 ? -1 : 0), y > 0 ? 1 : (y < 0 ? -1 : 0), z > 0 ? 1 : (z < 0 ? -1 : 0)),
+                            origCoords: { x, y, z }
+                        };
+                        scene.add(mesh);
+                        cubes.push(mesh);
+                    });
+                });
+            });
+        }
+        buildCube(3);
+
+        // ============ ПОДПИСИ ГРАНЕЙ ============
+        const faceNamesRu = { up: 'ВЕРХ', down: 'НИЗ', front: 'ПЕРЕД', back: 'ЗАД', right: 'ПРАВО', left: 'ЛЕВО' };
+        function createLabelWithStroke(text, pos, rot) {
+            const canvas = document.createElement('canvas');
+            canvas.width = 512; canvas.height = 128;
+            const ctx = canvas.getContext('2d');
+            ctx.font = `bold 64px "Segoe UI",sans-serif`;
+            ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+            ctx.strokeStyle = '#000'; ctx.lineWidth = 6; ctx.strokeText(text, 256, 64);
+            ctx.fillStyle = '#fff'; ctx.fillText(text, 256, 64);
+            
+            const tex = new THREE.CanvasTexture(canvas);
+            tex.anisotropy = maxAnisotropy;
+            const mat = new THREE.MeshBasicMaterial({ map: tex, transparent: true, side: THREE.DoubleSide });
+            const p = new THREE.Mesh(new THREE.PlaneGeometry(2.5, 0.62), mat);
+            p.position.copy(pos); p.rotation.copy(rot); p.visible = false;
+            labelsGroup.add(p);
+            return p;
+        }
+
+        faceLabels.up = createLabelWithStroke(faceNamesRu.up, new THREE.Vector3(0, LABEL_DISTANCE, 0), new THREE.Euler(-Math.PI / 2, 0, 0));
+        faceLabels.down = createLabelWithStroke(faceNamesRu.down, new THREE.Vector3(0, -LABEL_DISTANCE, 0), new THREE.Euler(Math.PI / 2, 0, 0));
+        faceLabels.front = createLabelWithStroke(faceNamesRu.front, new THREE.Vector3(0, 0, LABEL_DISTANCE), new THREE.Euler(0, 0, 0));
+        faceLabels.back = createLabelWithStroke(faceNamesRu.back, new THREE.Vector3(0, 0, -LABEL_DISTANCE), new THREE.Euler(0, Math.PI, 0));
+        faceLabels.right = createLabelWithStroke(faceNamesRu.right, new THREE.Vector3(LABEL_DISTANCE, 0, 0), new THREE.Euler(0, Math.PI / 2, 0));
+        faceLabels.left = createLabelWithStroke(faceNamesRu.left, new THREE.Vector3(-LABEL_DISTANCE, 0, 0), new THREE.Euler(0, -Math.PI / 2, 0));
+
+        // ============ АНИМАЦИИ ВРАЩЕНИЯ И МИКСА ============
+        function startLayerRotation(axis, index, dir) {
+            if (isAnimating || isSnapAnimating) return;
+            onCubeActionStart(); // скрываем подсказку при начале вращения слоя
+            isAnimating = true; animAxis = axis; animDir = dir; animProgress = 0;
+            
+            if (currentSize === 3) {
+                animBlocks = cubes.filter(c => Math.round(c.position[axis] / STEP) === index);
+            } else {
+                animBlocks = cubes.filter(c => (index > 0 ? c.position[axis] > 0 : c.position[axis] < 0));
+            }
+            if (animBlocks.length === 0) { isAnimating = false; return; }
+            animGroup.rotation.set(0, 0, 0);
+            animBlocks.forEach(b => animGroup.attach(b));
+        }
+
+        function processAutoAnimation() {
+            if (!isAnimating) return;
+            animProgress += ANIM_SPEED;
+            if (animProgress >= 1) {
+                animGroup.rotation[animAxis] = (Math.PI / 2) * animDir;
+                snapAndUpdate([...animBlocks]);
+                isAnimating = false;
+                if (isShuffling) startShuffleMove();
+            } else {
+                const t = animProgress;
+                animGroup.rotation[animAxis] = (Math.PI / 2) * animDir * (t * t * (3 - 2 * t));
+            }
+        }
+
+        function processSnapAnimation() {
+            if (!isSnapAnimating) return;
+            const remaining = snapTargetAngle - animGroup.rotation[snapAxis];
+            if (Math.abs(remaining) < SNAP_THRESHOLD) {
+                animGroup.rotation[snapAxis] = snapTargetAngle;
+                snapAndUpdate(snapBlocks);
+                isSnapAnimating = false;
+            } else {
+                animGroup.rotation[snapAxis] += remaining * SNAP_SPEED;
+            }
+        }
+
+        function startShuffleMove() {
+            if (shuffleIndex >= shuffleMoves.length) { isShuffling = false; setButtonsDisabled(false); return; }
+            const m = shuffleMoves[shuffleIndex++];
+            startLayerRotation(m.axis, m.index, m.dir);
+        }
+
+        function shuffleCube() {
+            if (isAnimating || isSnapAnimating || isShuffling || scatterAnim || isRealigning) return;
+            onCubeActionStart(); // скрываем подсказку при миксе
+            const axes = ['x', 'y', 'z'];
+            const layers = currentSize === 3 ? [-1, 0, 1] : [-1, 1];
+            shuffleMoves = [];
+            for (let i = 0; i < 10; i++) {
+                shuffleMoves.push({
+                    axis: axes[Math.floor(Math.random() * 3)],
+                    index: layers[Math.floor(Math.random() * layers.length)],
+                    dir: Math.random() > 0.5 ? 1 : -1
+                });
+            }
+            shuffleIndex = 0; isShuffling = true; setButtonsDisabled(true); startShuffleMove();
+        }
+
+        // ============ ИСПРАВЛЕННАЯ ЛОГИКА СБРОСА ============
+        function processScatterAnimation(now) {
+            if (!scatterAnim) return;
+            const elapsed = now - scatterAnim.startTime;
+            let t = elapsed / scatterAnim.duration;
+
+            if (scatterAnim.type === 'scatter') {
+                if (t >= 1) {
+                    scatterAnim = {
+                        type: 'assemble',
+                        startTime: performance.now(),
+                        duration: 700,
+                        startPositions: cubes.map(c => c.position.clone()),
+                        startRotations: cubes.map(c => c.rotation.clone())
+                    };
+                    return;
+                }
+                t = t * (2 - t); 
+                cubes.forEach((c, idx) => {
+                    const dir = scatterAnim.dirs[idx];
+                    c.position.copy(c.userData.originalPos).addScaledVector(dir, scatterAnim.maxDist * t);
+                    c.rotation.set(
+                        scatterAnim.rotations[idx].x * t,
+                        scatterAnim.rotations[idx].y * t,
+                        scatterAnim.rotations[idx].z * t
+                    );
+                });
+            } else {
+                t = Math.min(t, 1);
+                t = t * t * (3 - 2 * t); 
+                cubes.forEach((c, idx) => {
+                    c.position.lerpVectors(scatterAnim.startPositions[idx], c.userData.originalPos, t);
+                    c.rotation.x = THREE.MathUtils.lerp(scatterAnim.startRotations[idx].x, 0, t);
+                    c.rotation.y = THREE.MathUtils.lerp(scatterAnim.startRotations[idx].y, 0, t);
+                    c.rotation.z = THREE.MathUtils.lerp(scatterAnim.startRotations[idx].z, 0, t);
+                });
+            }
+
+            if (t >= 1 && scatterAnim.type === 'assemble') {
+                cubes.forEach(c => {
+                    c.position.copy(c.userData.originalPos);
+                    c.rotation.set(0, 0, 0);
+                });
+                scatterAnim = null;
+                setButtonsDisabled(false);
+            }
+        }
+
+        // Переопределяем обработчик кнопки сброса
+        document.getElementById('btnReset').onclick = () => {
+            if (isAnimating || isSnapAnimating || scatterAnim || isShuffling || isRealigning) return;
+            onCubeActionStart(); // скрываем подсказку при сбросе
+            setButtonsDisabled(true);
+            
+            const dirs = cubes.map(() => new THREE.Vector3(
+                (Math.random()-0.5) * 2, 
+                (Math.random()-0.5) * 2, 
+                (Math.random()-0.5) * 2
+            ).normalize());
+            
+            const rotations = cubes.map(() => new THREE.Vector3(
+                (Math.random()-0.5) * 6, 
+                (Math.random()-0.5) * 6, 
+                (Math.random()-0.5) * 6
+            ));
+            
+            scatterAnim = {
+                type: 'scatter',
+                startTime: performance.now(),
+                duration: 600,
+                dirs,
+                rotations,
+                maxDist: 4
+            };
+        };
+
+        // ============ АВТО-ВРАЩЕНИЕ И REALIGN ============
+        function processChaosRotation(dt) {
+            if (!isAutoRotating || isRealigning || scatterAnim) return;
+            const now = performance.now();
+            if (now - lastChaosChange > CHAOS_CHANGE_INTERVAL) {
+                chaosTargetSpeedX = (Math.random() - 0.5) * CHAOS_MAX_SPEED * 2;
+                chaosTargetSpeedY = (Math.random() - 0.5) * CHAOS_MAX_SPEED * 2;
+                lastChaosChange = now;
+            }
+            chaosSpeedX += (chaosTargetSpeedX - chaosSpeedX) * 0.02;
+            chaosSpeedY += (chaosTargetSpeedY - chaosSpeedY) * 0.02;
+            rotateCameraFree(chaosSpeedX * dt * 0.0005, chaosSpeedY * dt * 0.0005);
+        }
+
+        function toggleAutoRotate() {
+            if (isRealigning || scatterAnim) return;
+            if (!isAutoRotating) onCubeActionStart(); // при включении авто-вращения прячем подсказку
+            isAutoRotating = !isAutoRotating;
+            const btn = document.getElementById('btnAutoRotate');
+            if (isAutoRotating) {
+                btn.textContent = '⏹ Стоп'; btn.classList.add('active');
+                updateChaosTargets(); lastChaosChange = performance.now();
+            } else {
+                btn.textContent = '🔄 Авто'; btn.classList.remove('active');
+                chaosTargetSpeedX = 0; chaosTargetSpeedY = 0;
+            }
+        }
+        function updateChaosTargets() {
+            chaosTargetSpeedX = (Math.random() - 0.5) * CHAOS_MAX_SPEED * 2;
+            chaosTargetSpeedY = (Math.random() - 0.5) * CHAOS_MAX_SPEED * 2;
+        }
+
+        function realignCube() {
+            if (isAnimating || isSnapAnimating || isShuffling || scatterAnim || isRealigning) return;
+            onCubeActionStart(); // скрываем подсказку при выравнивании
+            if (isAutoRotating) toggleAutoRotate();
+            snapAndUpdate(cubes);
+            isRealigning = true; realignAnim.active = true;
+            realignAnim.startPos.copy(camera.position); realignAnim.startUp.copy(camera.up);
+            realignAnim.startTime = performance.now(); setButtonsDisabled(true);
+        }
+
+        function processRealignAnimation(now) {
+            if (!realignAnim.active) return;
+            const elapsed = now - realignAnim.startTime;
+            const t = Math.min(elapsed / realignAnim.duration, 1);
+            const eased = t * t * (3 - 2 * t);
+            camera.position.lerpVectors(realignAnim.startPos, realignAnim.endPos, eased);
+            camera.up.lerpVectors(realignAnim.startUp, realignAnim.endUp, eased).normalize();
+            camera.lookAt(cameraState.target);
+            if (t >= 1) {
+                realignAnim.active = false; isRealigning = false; setButtonsDisabled(false);
+            }
+        }
+
+        // ============ МЕХАНИКА ПОВОРОТА ГРАНЕЙ ============
+        function handleStart(clientX, clientY) {
+            if (isAnimating || isShuffling || isSnapAnimating || scatterAnim || isRealigning) return;
+            
+            pointer.x = (clientX / window.innerWidth) * 2 - 1;
+            pointer.y = -(clientY / window.innerHeight) * 2 + 1;
+            
+            raycaster.setFromCamera(pointer, camera);
+            const intersects = raycaster.intersectObjects(cubes);
+            
+            if (intersects.length > 0) {
+                // Начало жеста касания грани — сразу прячем подсказку (пользователь собирается крутить)
+                onCubeActionStart();
+                intersectedObject = intersects[0].object;
+                hitWorldPoint.copy(intersects[0].point);
+                let rawNormal = intersects[0].face.normal.clone().applyQuaternion(intersectedObject.quaternion);
+                
+                if (Math.abs(rawNormal.x) > Math.abs(rawNormal.y) && Math.abs(rawNormal.x) > Math.abs(rawNormal.z)) snappedNormal.set(Math.sign(rawNormal.x), 0, 0);
+                else if (Math.abs(rawNormal.y) > Math.abs(rawNormal.x) && Math.abs(rawNormal.y) > Math.abs(rawNormal.z)) snappedNormal.set(0, Math.sign(rawNormal.y), 0);
+                else snappedNormal.set(0, 0, Math.sign(rawNormal.z));
+                
+                if (snappedNormal.x !== 0) { axisOption1 = 'y'; worldTangent1.set(0, 0, 1); axisOption2 = 'z'; worldTangent2.set(0, 1, 0); }
+                else if (snappedNormal.y !== 0) { axisOption1 = 'x'; worldTangent1.set(0, 0, 1); axisOption2 = 'z'; worldTangent2.set(1, 0, 0); }
+                else { axisOption1 = 'x'; worldTangent1.set(0, 1, 0); axisOption2 = 'y'; worldTangent2.set(1, 0, 0); }
+                
+                let screenP = projectToNDC(hitWorldPoint);
+                screenTangent1.copy(projectToNDC(hitWorldPoint.clone().add(worldTangent1)).sub(screenP));
+                screenTangent2.copy(projectToNDC(hitWorldPoint.clone().add(worldTangent2)).sub(screenP));
+                
+                startPointerNDC.set(pointer.x, pointer.y);
+                isPointerDown = true; dragAxisLocked = null; cameraState.isDragging = false;
+            } else {
+                cameraState.isDragging = true;
+                cameraState.prevX = clientX; cameraState.prevY = clientY;
+            }
+        }
+
+        function handleMove(clientX, clientY) {
+            if (cameraState.isDragging) {
+                const deltaX = (clientX - cameraState.prevX) * cameraState.rotateSpeed;
+                const deltaY = (clientY - cameraState.prevY) * cameraState.rotateSpeed;
+                rotateCameraFree(deltaX, deltaY);
+                cameraState.prevX = clientX; cameraState.prevY = clientY;
+                return;
+            }
+            if (!isPointerDown || isAnimating || isShuffling || isSnapAnimating || scatterAnim || isRealigning) return;
+
+            pointer.x = (clientX / window.innerWidth) * 2 - 1;
+            pointer.y = -(clientY / window.innerHeight) * 2 + 1;
+            let swipeVectorNDC = pointer.clone().sub(startPointerNDC);
+            
+            if (dragAxisLocked === null) {
+                if (swipeVectorNDC.length() > 0.03) {
+                    let dot1 = swipeVectorNDC.dot(screenTangent1);
+                    let dot2 = swipeVectorNDC.dot(screenTangent2);
+                    if (Math.abs(dot1) > Math.abs(dot2)) {
+                        dragAxisLocked = axisOption1; chosenScreenTangent.copy(screenTangent1); chosenWorldTangent.copy(worldTangent1);
+                    } else {
+                        dragAxisLocked = axisOption2; chosenScreenTangent.copy(screenTangent2); chosenWorldTangent.copy(worldTangent2);
+                    }
+                    
+                    if (currentSize === 3) {
+                        dragIndex = Math.round(intersectedObject.position[dragAxisLocked] / STEP);
+                        dragBlocks = cubes.filter(c => Math.round(c.position[dragAxisLocked] / STEP) === dragIndex);
+                    } else {
+                        const isPositiveSide = intersectedObject.position[dragAxisLocked] > 0;
+                        dragIndex = isPositiveSide ? 1 : -1;
+                        dragBlocks = cubes.filter(c => isPositiveSide ? c.position[dragAxisLocked] > 0 : c.position[dragAxisLocked] < 0);
+                    }
+                    if (dragBlocks.length === 0) { dragAxisLocked = null; return; }
+                    animGroup.rotation.set(0, 0, 0);
+                    dragBlocks.forEach(b => animGroup.attach(b));
+                    rotDirSign = Math.sign(new THREE.Vector3().crossVectors(snappedNormal, chosenWorldTangent)[dragAxisLocked]);
+                }
+            } else {
+                let scalarProj = swipeVectorNDC.dot(chosenScreenTangent) / chosenScreenTangent.lengthSq();
+                animGroup.rotation[dragAxisLocked] = scalarProj * (Math.PI / 2) * rotDirSign;
+            }
+        }
+
+        function handleEnd() {
+            isPointerDown = false; cameraState.isDragging = false;
+            if (dragAxisLocked !== null) {
+                let currentAngle = animGroup.rotation[dragAxisLocked];
+                isSnapAnimating = true; snapAxis = dragAxisLocked;
+                snapTargetAngle = Math.round(currentAngle / (Math.PI / 2)) * (Math.PI / 2);
+                snapBlocks = [...dragBlocks]; dragAxisLocked = null;
+            }
+        }
+
+        const raycaster = new THREE.Raycaster();
+        const pointer = new THREE.Vector2();
+
+        window.addEventListener('touchstart', (e) => {
+            if (e.target.tagName === 'BUTTON' || e.target.closest('#ui-wrapper')) return;
+            if(e.touches.length === 1) handleStart(e.touches[0].clientX, e.touches[0].clientY);
+        }, { passive: false });
+
+        window.addEventListener('touchmove', (e) => {
+            if (e.target.tagName === 'BUTTON' || e.target.closest('#ui-wrapper')) return;
+            if(e.touches.length === 1) { e.preventDefault(); handleMove(e.touches[0].clientX, e.touches[0].clientY); }
+        }, { passive: false });
+
+        window.addEventListener('touchend', handleEnd);
+
+        window.addEventListener('pointerdown', (e) => {
+            if (e.pointerType === 'touch' || e.target.tagName === 'BUTTON' || e.target.closest('#ui-wrapper')) return;
+            handleStart(e.clientX, e.clientY);
+        });
+        window.addEventListener('pointermove', (e) => {
+            if (e.pointerType === 'touch') return;
+            handleMove(e.clientX, e.clientY);
+        });
+        window.addEventListener('pointerup', (e) => {
+            if (e.pointerType === 'touch') return;
+            handleEnd();
+        });
+
+        // ============ ОБРАБОТКА КНОПОК И ИНТЕРФЕЙСА ============
+        document.getElementById('btnShuffle').addEventListener('click', shuffleCube);
+        document.getElementById('btnAutoRotate').addEventListener('click', toggleAutoRotate);
+        document.getElementById('btnRealign').addEventListener('click', realignCube);
+        
+        document.getElementById('btnToggleUI').addEventListener('click', () => {
+            const wrapperBtn = document.getElementById('btnToggleUI');
+            const container = document.getElementById('ui-container');
+            wrapperBtn.classList.toggle('menu-hidden');
+            container.classList.toggle('hidden');
+            const arrow = wrapperBtn.querySelector('.arrow');
+            arrow.textContent = container.classList.contains('hidden') ? '▲' : '▼';
+        });
+
+        document.getElementById('btnFaces').addEventListener('click', () => {
+            facesVisible = !facesVisible;
+            const btn = document.getElementById('btnFaces');
+            btn.classList.toggle('active', facesVisible);
+            btn.textContent = facesVisible ? '🎨 Скрыть' : '🎨 Грани';
+            for (const key in faceLabels) faceLabels[key].visible = facesVisible;
+        });
+
+        document.getElementById('btnNumbers').addEventListener('click', () => {
+            numbersVisible = !numbersVisible; updateAllStickers();
+            const btn = document.getElementById('btnNumbers');
+            btn.classList.toggle('active', numbersVisible);
+            btn.textContent = numbersVisible ? '🔢 Скрыть' : '🔢 Числа';
+        });
+
+        document.getElementById('btnToggleSize').addEventListener('click', () => {
+            if (isAnimating || isSnapAnimating || isShuffling || scatterAnim || isRealigning) return;
+            onCubeActionStart(); // скрываем подсказку при смене размера
+            const btn = document.getElementById('btnToggleSize');
+            if (currentSize === 3) { currentSize = 2; btn.textContent = '🧩 3х3'; }
+            else { currentSize = 3; btn.textContent = '🧩 2х2'; }
+            buildCube(currentSize);
+        });
+
+        // ============ ИГРОВОЙ ЦИКЛ ============
+        let lastFrameTime = performance.now();
+        function animate() {
+            requestAnimationFrame(animate);
+            const now = performance.now();
+            const dt = Math.min(now - lastFrameTime, 30);
+            lastFrameTime = now;
+            
+            processScatterAnimation(now);
+            processRealignAnimation(now);
+            if (!isRealigning && !scatterAnim) processChaosRotation(dt);
+            processSnapAnimation();
+            processAutoAnimation();
+            
+            renderer.render(scene, camera);
+        }
+        animate();
+    </script>
+</body>
+</html>
